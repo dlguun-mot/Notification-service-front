@@ -11,14 +11,23 @@ export function useNotifications() {
   const { data, isLoading, error } = useQuery({
     queryKey: NOTIFICATIONS_QUERY_KEY,
     queryFn: () => notificationService.getNotifications({ limit: 10 }),
+    // Smart Polling Logic: check if any item in current state is 'pending'
+    refetchInterval: (query) => {
+      const items: NotificationItem[] = query?.state?.data?.items || [];
+      const hasPendingItems = items.some((item) => item.status === "pending");
+
+      // Poll every 3 seconds if items are pending; otherwise, turn polling off (false)
+      return hasPendingItems ? 5000 : false;
+    },
+    // Keep pulling in background smoothly without re-triggering visual table loading spinners
+    refetchIntervalInBackground: true,
   });
 
-  // Change Omit<NotificationItem, "id" | "createdAt">
-  // To include | "status" inside the variables definition argument:
   const createMutation = useMutation({
     mutationFn: (newNotif: Omit<NotificationItem, "id" | "createdAt" | "status">) =>
       notificationService.createNotification(newNotif),
     onSuccess: () => {
+      // Immediately pull fresh table data upon completing creation mutation
       queryClient.invalidateQueries({ queryKey: NOTIFICATIONS_QUERY_KEY });
       message.success("Notification successfully saved to backend!");
     },

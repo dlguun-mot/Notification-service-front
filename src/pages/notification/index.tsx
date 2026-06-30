@@ -15,10 +15,6 @@ export default function NotificationPage() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [selectedNotification, setSelectedNotification] = useState<NotificationItem | null>(null);
 
-  const handleCreateNotification = async (newNotif: Omit<NotificationItem, "id" | "createdAt">) => {
-    await createNotification(newNotif);
-  };
-
   const truncateBody = (text: string) => {
     return text.length > 100 ? `${text.substring(0, 100)}...` : text;
   };
@@ -129,7 +125,7 @@ export default function NotificationPage() {
         open={isCreateOpen}
         onClose={() => setIsCreateOpen(false)}
         onCreate={createNotification}
-        isPending={isCreating} // Wire up tracking flag
+        isPending={isCreating}
       />
 
       <NotificationDetailsModal
