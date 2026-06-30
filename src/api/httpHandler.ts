@@ -1,4 +1,4 @@
-const BASE_URL = "http://localhost:3000/dev";
+const BASE_URL = "http://localhost:3000/local";
 
 interface RequestOptions extends RequestInit {
   bodyData?: any;
