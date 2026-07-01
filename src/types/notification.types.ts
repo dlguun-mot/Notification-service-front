@@ -20,6 +20,19 @@ export interface NotificationItem {
   id: string;
   title: string;
   body: string;
-  status: "success" | "pending" | "fail";
+  status: "Success" | "Fail" | "Pending";
   createdAt: string;
+  updatedAt?: string;
+}
+
+export interface PaginationMeta {
+  limit: number;
+  page: number;
+  pageCount: number;
+}
+
+// Ensure this matches what your backend returns!
+export interface FetchNotificationsResponse {
+  items: NotificationItem[];
+  pagination: PaginationMeta;
 }

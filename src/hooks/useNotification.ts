@@ -3,23 +3,31 @@ import { notificationService } from "../services/notification/notification.servi
 import { message } from "antd";
 import type { NotificationItem } from "../types/notification.types";
 
-const NOTIFICATIONS_QUERY_KEY = ["notifications"];
+export interface FetchNotificationsResponse {
+  items: NotificationItem[];
+  pagination: {
+    limit: number;
+    page: number;
+    pageCount: number;
+  };
+}
 
-export function useNotifications() {
+// Accept params such as page and limit
+export function useNotifications(params: { page: number; limit: number }) {
   const queryClient = useQueryClient();
+  const { page, limit } = params;
 
-  const { data, isLoading, error } = useQuery({
-    queryKey: NOTIFICATIONS_QUERY_KEY,
-    queryFn: () => notificationService.getNotifications({ limit: 10 }),
-    // Smart Polling Logic: check if any item in current state is 'pending'
+  const { data, isLoading, error } = useQuery<FetchNotificationsResponse>({
+    // CRITICAL: include 'page' and 'limit' here so query automatically refetches on change
+    queryKey: ["notifications", { page, limit }],
+    queryFn: () => notificationService.getNotifications({ page, limit }),
+
     refetchInterval: (query) => {
-      const items: NotificationItem[] = query?.state?.data?.items || [];
-      const hasPendingItems = items.some((item) => item.status === "pending");
-
-      // Poll every 3 seconds if items are pending; otherwise, turn polling off (false)
+      const stateData = query?.state?.data as FetchNotificationsResponse | undefined;
+      const items = stateData?.items || [];
+      const hasPendingItems = items.some((item) => (item.status || "").toLowerCase() === "pending");
       return hasPendingItems ? 5000 : false;
     },
-    // Keep pulling in background smoothly without re-triggering visual table loading spinners
     refetchIntervalInBackground: true,
   });
 
@@ -27,18 +35,21 @@ export function useNotifications() {
     mutationFn: (newNotif: Omit<NotificationItem, "id" | "createdAt" | "status">) =>
       notificationService.createNotification(newNotif),
     onSuccess: () => {
-      // Immediately pull fresh table data upon completing creation mutation
-      queryClient.invalidateQueries({ queryKey: NOTIFICATIONS_QUERY_KEY });
+      // Invalidate all notifications cache blocks upon create
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
       message.success("Notification successfully saved to backend!");
     },
-    onError: (error) => {
-      console.error("Mutation failed:", error);
+    onError: (err) => {
+      console.error("Mutation failed:", err);
       message.error("Failed to persist notification on the server endpoint.");
     },
   });
 
   return {
-    notifications: data?.items || [],
+    notifications: data || {
+      items: [],
+      pagination: { limit: 10, page: 1, pageCount: 0 },
+    },
     loading: isLoading,
     error,
     createNotification: createMutation.mutateAsync,

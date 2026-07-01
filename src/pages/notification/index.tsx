@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { Button, Card, Typography, Layout, Table, Tag, Input, Space } from "antd";
-import { PlusOutlined, SearchOutlined } from "@ant-design/icons";
+import { Button, Card, Typography, Layout, Table, Tag } from "antd";
+import { PlusOutlined } from "@ant-design/icons";
 import type { ColumnsType } from "antd/es/table";
 import NotificationCreateModal from "./components/NotificationCreateModal";
 import NotificationDetailsModal from "./components/NotificationDetailsModal";
@@ -11,7 +11,16 @@ const { Header, Content } = Layout;
 const { Title, Link, Text } = Typography;
 
 export default function NotificationPage() {
-  const { notifications, loading, createNotification, isCreating } = useNotifications();
+  // 1. Establish state configurations tracking pagination position
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number>(10);
+
+  // 2. Feed parameters continuously down into the active hook pipeline
+  const { notifications, loading, createNotification, isCreating } = useNotifications({
+    page: currentPage,
+    limit: pageSize,
+  });
+
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [selectedNotification, setSelectedNotification] = useState<NotificationItem | null>(null);
 
@@ -25,10 +34,11 @@ export default function NotificationPage() {
       dataIndex: "status",
       key: "status",
       width: 120,
-      render: (status: NotificationItem["status"]) => {
+      render: (status: string) => {
         let color = "processing";
-        if (status === "success") color = "success";
-        if (status === "fail") color = "error";
+        const normalizedStatus = (status || "").toLowerCase();
+        if (normalizedStatus === "success") color = "success";
+        if (normalizedStatus === "fail") color = "error";
         return <Tag color={color}>{(status || "PENDING").toUpperCase()}</Tag>;
       },
     },
@@ -37,33 +47,6 @@ export default function NotificationPage() {
       dataIndex: "title",
       key: "title",
       width: 250,
-      filterDropdown: ({ setSelectedKeys, selectedKeys, confirm, clearFilters }) => (
-        <div style={{ padding: 8 }} onKeyDown={(e) => e.stopPropagation()}>
-          <Input
-            placeholder="Search title..."
-            value={selectedKeys[0]}
-            onChange={(e) => setSelectedKeys(e.target.value ? [e.target.value] : [])}
-            onPressEnter={() => confirm()}
-            style={{ marginBottom: 8, display: "block" }}
-          />
-          <Space>
-            <Button
-              type="primary"
-              onClick={() => confirm()}
-              icon={<SearchOutlined />}
-              size="small"
-              style={{ width: 90 }}
-            >
-              Search
-            </Button>
-            <Button onClick={() => clearFilters && clearFilters()} size="small" style={{ width: 90 }}>
-              Reset
-            </Button>
-          </Space>
-        </div>
-      ),
-      filterIcon: (filtered: boolean) => <SearchOutlined style={{ color: filtered ? "#1677ff" : undefined }} />,
-      onFilter: (value, record) => record.title.toLowerCase().includes((value as string).toLowerCase()),
       render: (text: string, record: NotificationItem) => (
         <Link onClick={() => setSelectedNotification(record)} style={{ fontWeight: 600 }}>
           {text}
@@ -81,8 +64,12 @@ export default function NotificationPage() {
       dataIndex: "createdAt",
       key: "createdAt",
       width: 180,
+      render: (dateStr: string) => (dateStr ? new Date(dateStr).toLocaleString() : "-"),
     },
   ];
+
+  const tableData = notifications?.items || [];
+  const paginationMeta = notifications?.pagination;
 
   return (
     <Layout style={{ minHeight: "100vh", backgroundColor: "#f5f5f5" }}>
@@ -107,15 +94,23 @@ export default function NotificationPage() {
       <Content style={{ padding: "24px" }}>
         <Card title="Notifications Panel" style={{ maxWidth: 1200, margin: "0 auto" }}>
           <Table
-            dataSource={notifications}
+            dataSource={tableData}
             columns={columns}
             rowKey="id"
             loading={loading}
             pagination={{
-              defaultPageSize: 10,
+              current: currentPage,
+              pageSize: pageSize,
               showSizeChanger: true,
               pageSizeOptions: ["5", "10", "20", "50"],
               position: ["bottomRight"],
+              // Deriving total backend rows matching paginationMeta layout definitions
+              total: paginationMeta ? paginationMeta.pageCount * paginationMeta.limit : 0,
+            }}
+            // 3. Capture page transitions from Ant Design and apply updates safely
+            onChange={(pagination) => {
+              if (pagination.current) setCurrentPage(pagination.current);
+              if (pagination.pageSize) setPageSize(pagination.pageSize);
             }}
           />
         </Card>

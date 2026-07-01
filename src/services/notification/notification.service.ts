@@ -8,29 +8,35 @@ export interface FetchNotificationsParams {
   title?: string;
 }
 
+// FIXED: Aligned perfectly with your backend's exact curl payload metadata structure
 export interface FetchNotificationsResponse {
   items: NotificationItem[];
-  hasMore: boolean;
+  pagination: {
+    limit: number;
+    page: number;
+    pageCount: number;
+  };
 }
 
 /**
  * Shared structural data adapter mapper utility
  */
 const mapToFrontendModel = (item: any): NotificationItem => {
-  let resolvedStatus: NotificationItem["status"] = "pending";
-  const backendStatus = item.status?.toLowerCase();
+  // FIXED: Standardized fallback using the actual backend casing style ("Success", "Fail", "Pending")
+  let resolvedStatus: NotificationItem["status"] = "Pending";
+  const backendStatus = (item.status || "").toLowerCase();
 
-  if (backendStatus === "success") resolvedStatus = "success";
-  else if (backendStatus === "pending") resolvedStatus = "pending";
-  else if (backendStatus === "fail") resolvedStatus = "fail";
+  if (backendStatus === "success") resolvedStatus = "Success";
+  else if (backendStatus === "pending") resolvedStatus = "Pending";
+  else if (backendStatus === "fail") resolvedStatus = "Fail";
 
   const rawDate = item.createdAt || item.updatedAt || new Date().toISOString();
   const formattedDate = rawDate.replace("T", " ").substring(0, 19);
 
   return {
     id: item.id,
-    title: item.title || `Status Alert (${item.status})`,
-    body: item.body || `The transaction state shifted to ${item.status}.`,
+    title: item.title || `Status Alert (${resolvedStatus})`,
+    body: item.body || `The transaction state shifted to ${resolvedStatus}.`,
     status: resolvedStatus,
     createdAt: formattedDate,
   };
@@ -55,16 +61,20 @@ export const notificationService = {
     // Execute typed target payload lookup request cleanly
     const data = await httpHandler<any>(`${NOTIFICATION_PATHS.BASE}?${urlParams.toString()}`);
 
+    // FIXED: Correctly pass down the original pagination block to feed TanStack Query and AntD components
     return {
-      items: (data.items || []).map(mapToFrontendModel),
-      hasMore: data.pagination?.hasMore || false,
+      items: (data?.items || []).map(mapToFrontendModel),
+      pagination: data?.pagination || {
+        limit: Number(limit),
+        page: Number(page),
+        pageCount: 1,
+      },
     };
   },
 
   /**
    * Dispatches and saves a new notification item record using the httpHandler
    */
-  //  Updated signature omitting "status" entirely
   createNotification: async (
     payload: Omit<NotificationItem, "id" | "createdAt" | "status">,
   ): Promise<NotificationItem> => {
