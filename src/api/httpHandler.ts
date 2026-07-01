@@ -1,5 +1,4 @@
-const BASE_URL = "http://localhost:3000/local";
-
+const BASE_URL = import.meta.env.VITE_BASE_URL || "http://localhost:3000/local";
 interface RequestOptions extends RequestInit {
   bodyData?: any;
 }
