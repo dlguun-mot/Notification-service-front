@@ -19,9 +19,33 @@ export interface FetchNotificationsResponse {
 }
 
 /**
+ * Structural backend data shape contract interface
+ */
+interface BackendNotificationItem {
+  id?: string;
+  title?: string;
+  body?: string;
+  status?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+/**
+ * Structural backend paginated list contract interface
+ */
+interface BackendFetchResponse {
+  items?: BackendNotificationItem[];
+  pagination?: {
+    limit: number;
+    page: number;
+    pageCount: number;
+  };
+}
+
+/**
  * Shared structural data adapter mapper utility
  */
-const mapToFrontendModel = (item: any): NotificationItem => {
+const mapToFrontendModel = (item: BackendNotificationItem): NotificationItem => {
   // FIXED: Standardized fallback using the actual backend casing style ("Success", "Fail", "Pending")
   let resolvedStatus: NotificationItem["status"] = "Pending";
   const backendStatus = (item.status || "").toLowerCase();
@@ -34,7 +58,7 @@ const mapToFrontendModel = (item: any): NotificationItem => {
   const formattedDate = rawDate.replace("T", " ").substring(0, 19);
 
   return {
-    id: item.id,
+    id: item.id || "",
     title: item.title || `Status Alert (${resolvedStatus})`,
     body: item.body || `The transaction state shifted to ${resolvedStatus}.`,
     status: resolvedStatus,
@@ -58,8 +82,8 @@ export const notificationService = {
       urlParams.append("title", title);
     }
 
-    // Execute typed target payload lookup request cleanly
-    const data = await httpHandler<any>(`${NOTIFICATION_PATHS.BASE}?${urlParams.toString()}`);
+    // Execute typed target payload lookup request cleanly with concrete interface mapping
+    const data = await httpHandler<BackendFetchResponse>(`${NOTIFICATION_PATHS.BASE}?${urlParams.toString()}`);
 
     // FIXED: Correctly pass down the original pagination block to feed TanStack Query and AntD components
     return {
@@ -78,7 +102,7 @@ export const notificationService = {
   createNotification: async (
     payload: Omit<NotificationItem, "id" | "createdAt" | "status">,
   ): Promise<NotificationItem> => {
-    const data = await httpHandler<any>(NOTIFICATION_PATHS.BASE, {
+    const data = await httpHandler<BackendNotificationItem>(NOTIFICATION_PATHS.BASE, {
       method: "POST",
       bodyData: {
         title: payload.title,
@@ -88,6 +112,6 @@ export const notificationService = {
       },
     });
 
-    return mapToFrontendModel(data);
+    return mapToFrontendModel(data || {});
   },
 };
